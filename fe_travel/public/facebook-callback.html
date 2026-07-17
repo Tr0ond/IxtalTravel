@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Facebook OAuth Callback</title>
+</head>
+<body>
+<script>
+(function(){
+  // Facebook returns access_token in URL fragment (#access_token=...)
+  const hash = window.location.hash.substring(1);
+  const params = new URLSearchParams(hash);
+  const access_token = params.get('access_token');
+
+  // Also accept code in query string if using response_type=code
+  const qs = new URLSearchParams(window.location.search);
+  const code = qs.get('code');
+
+  if (window.opener) {
+    if (access_token) {
+      window.opener.postMessage({ type: 'fb-auth', access_token }, window.opener.location.origin);
+    } else if (code) {
+      window.opener.postMessage({ type: 'fb-auth', code }, window.opener.location.origin);
+    } else {
+      window.opener.postMessage({ type: 'fb-auth', error: 'no_token' }, window.opener.location.origin);
+    }
+  }
+
+  // close popup after short delay
+  setTimeout(() => window.close(), 500);
+})();
+</script>
+</body>
+</html>

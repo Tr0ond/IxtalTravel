@@ -1,0 +1,341 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\NhanVien;
+use App\Models\PhanQuyen;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+
+class NhanVienController extends Controller
+{
+    public function getData()
+    {
+
+        $user = Auth::guard('sanctum')->user();
+        // Nếu là master admin thì bỏ qua kiểm tra quyền
+        if ($user->is_master != 1) {
+            $id_chuc_nang = 3;
+            $id_chuc_vu   = $user->id_chuc_vu;
+            $check        = PhanQuyen::where('id_chuc_vu', $id_chuc_vu)->where('id_chuc_nang', $id_chuc_nang)->first();
+            if (!$check) {
+                return response()->json([
+                    'status'    =>  0,
+                    'message'   =>  'Bạn không có quyền thực hiện chức năng này!'
+                ]);
+            }
+        }
+
+        $data = NhanVien::join('chuc_vus', 'nhan_viens.id_chuc_vu', '=', 'chuc_vus.id')
+            ->select(
+                'nhan_viens.id',
+                'nhan_viens.email',
+                'nhan_viens.ho_va_ten',
+                'nhan_viens.so_dien_thoai',
+                'nhan_viens.dia_chi',
+                'nhan_viens.ngay_sinh',
+                'nhan_viens.tinh_trang',
+                'nhan_viens.id_chuc_vu',
+                'chuc_vus.ten_chuc_vu',
+            )->get();
+        return response()->json([
+            'status'  => true,
+            'message' => 'Lấy dữ liệu nhân viên thành công',
+            'data'    => $data,
+        ]);
+    }
+
+    public function addData(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+        // Nếu là master admin thì bỏ qua kiểm tra quyền
+        if ($user->is_master != 1) {
+            $id_chuc_nang = 3;
+            $id_chuc_vu   = $user->id_chuc_vu;
+            $check        = PhanQuyen::where('id_chuc_vu', $id_chuc_vu)->where('id_chuc_nang', $id_chuc_nang)->first();
+            if (!$check) {
+                return response()->json([
+                    'status'    =>  0,
+                    'message'   =>  'Bạn không có quyền thực hiện chức năng này!'
+                ]);
+            }
+        }
+
+        NhanVien::create([
+            'email'         => $request->email,
+            'ho_va_ten'     => $request->ho_va_ten,
+            'password'      => $request->password,
+            'so_dien_thoai' => $request->so_dien_thoai,
+            'dia_chi'       => $request->dia_chi,
+            'ngay_sinh'     => $request->ngay_sinh,
+            'tinh_trang'    => $request->tinh_trang,
+            'id_chuc_vu'    => $request->id_chuc_vu
+        ]);
+        return response()->json([
+            'status' => true,
+            'message' => 'Thêm nhân viên thành công'
+        ]);
+    }
+
+    public function update(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+        // Nếu là master admin thì bỏ qua kiểm tra quyền
+        if ($user->is_master != 1) {
+            $id_chuc_nang = 3;
+            $id_chuc_vu   = $user->id_chuc_vu;
+            $check        = PhanQuyen::where('id_chuc_vu', $id_chuc_vu)->where('id_chuc_nang', $id_chuc_nang)->first();
+            if (!$check) {
+                return response()->json([
+                    'status'    =>  0,
+                    'message'   =>  'Bạn không có quyền thực hiện chức năng này!'
+                ]);
+            }
+        }
+
+        NhanVien::where('id', $request->id)->update([
+            'email'         => $request->email,
+            'ho_va_ten'     => $request->ho_va_ten,
+            'so_dien_thoai' => $request->so_dien_thoai,
+            'dia_chi'       => $request->dia_chi,
+            'ngay_sinh'     => $request->ngay_sinh,
+            'tinh_trang'    => $request->tinh_trang,
+            'id_chuc_vu'    => $request->id_chuc_vu
+        ]);
+
+        return response()->json([
+            'status'    => true,
+            'message'   => 'Cập nhật nhân viên ' . $request->ho_va_ten . ' thành công',
+        ]);
+    }
+
+    public function destroy(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+
+        // Kiểm tra tài khoản đã đăng nhập
+        if (!$user) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Bạn chưa đăng nhập!'
+            ], 401);
+        }
+
+        // Không cho tài khoản đang đăng nhập tự xóa chính mình
+        if ((int) $request->id === (int) $user->id) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Bạn không thể xóa tài khoản đang đăng nhập!'
+            ], 403);
+        }
+
+        // Nếu không phải Master Admin thì kiểm tra quyền quản lý tài khoản
+        if ((int) $user->is_master !== 1) {
+            $check = PhanQuyen::where('id_chuc_vu', $user->id_chuc_vu)
+                ->where('id_chuc_nang', 3)
+                ->exists();
+
+            if (!$check) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Bạn không có quyền thực hiện chức năng này!'
+                ], 403);
+            }
+        }
+
+        try {
+            $nhanVien = NhanVien::find($request->id);
+
+            if (!$nhanVien) {
+                return response()->json([
+                    'status'  => false,
+                    'message' => 'Không tìm thấy tài khoản nhân viên!'
+                ], 404);
+            }
+
+            // Xóa token của tài khoản trước
+            DB::table('personal_access_tokens')
+                ->where('tokenable_type', NhanVien::class)
+                ->where('tokenable_id', $nhanVien->id)
+                ->delete();
+
+            $nhanVien->delete();
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Xóa nhân viên thành công!'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status'  => false,
+                'message' => 'Có lỗi xảy ra: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function changeStatus(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+        // Nếu là master admin thì bỏ qua kiểm tra quyền
+        if ($user->is_master != 1) {
+            $id_chuc_nang = 3;
+            $id_chuc_vu   = $user->id_chuc_vu;
+            $check        = PhanQuyen::where('id_chuc_vu', $id_chuc_vu)->where('id_chuc_nang', $id_chuc_nang)->first();
+            if (!$check) {
+                return response()->json([
+                    'status'    =>  0,
+                    'message'   =>  'Bạn không có quyền thực hiện chức năng này!'
+                ]);
+            }
+        }
+
+        NhanVien::where('id', $request->id)->update(['tinh_trang' => $request->tinh_trang]);
+        return response()->json(['status' => true, 'message' => 'Thay đổi trạng thái nhân viên thành công']);
+    }
+
+    public function dangNhap(Request $request)
+    {
+        $check = NhanVien::where('email', $request->email)
+            ->where('password', $request->password)->first();
+        if ($check) {
+            return response()->json([
+                'status' => true,
+                'message' => 'Đăng nhập thành công',
+                'token' => $check->createToken('key_client')->plainTextToken,
+            ]);
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'Tài khoản sai email hoặc password',
+            ]);
+        }
+    }
+
+    public function checkToken(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+        if ($user) {
+            return response()->json([
+                'status' => true,
+                'ho_ten' => $user->ho_va_ten,
+                'email'  => $user->email,
+                'avatar'  => $user->avatar,
+            ]);
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'Bạn không có quyền truy cập.',
+            ]);
+        }
+    }
+
+    public function doiMatKhau(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+        if ($user && $user instanceof \App\Models\NhanVien) {
+            if ($request->new_password != $request->confirm_password) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Mật khẩu hiện mới và xác nhận không khớp. Vui lòng nhập lại.',
+                ]);
+            } else {
+                $user->update(['password' => $request->new_password]);
+                return response()->json([
+                    'status' => true,
+                    'message' => 'Đổi mật khẩu thành công',
+                ]);
+            }
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'Bạn không có quyền thực hiện chức năng này!',
+            ]);
+        }
+    }
+
+    public function getProfile(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+        if ($user && $user instanceof \App\Models\NhanVien) {
+            return response()->json([
+                'status' => true,
+                'data'   => $user,
+            ]);
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'Bạn không có quyền truy cập.',
+            ]);
+        }
+    }
+
+    public function updateProfile(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+        if ($user && $user instanceof \App\Models\NhanVien) {
+            $user->update([
+                'ho_va_ten'     => $request->ho_va_ten,
+                'so_dien_thoai' => $request->so_dien_thoai,
+                'dia_chi'       => $request->dia_chi,
+                'ngay_sinh'     => $request->ngay_sinh,
+                'avatar'        => $request->avatar,
+            ]);
+            return response()->json([
+                'status' => true,
+                'message' => 'Cập nhật thông tin profile thành công',
+            ]);
+        } else {
+            return response()->json([
+                'status' => false,
+                'message' => 'Bạn không có quyền thực hiện chức năng này!',
+            ]);
+        }
+    }
+
+    public function dangXuat(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+        if ($user && $user instanceof \App\Models\NhanVien) {
+            DB::table('personal_access_tokens')
+                ->where('id', $user->currentAccessToken()->id)
+                ->delete();
+            return response()->json([
+                'status'  => 1,
+                'message' => "Đăng xuất thành công",
+            ]);
+        } else {
+            return response()->json([
+                'status'  => 0,
+                'message' => "Có lỗi xảy ra",
+            ]);
+        }
+    }
+
+    public function dangXuatAll(Request $request)
+    {
+        $user = Auth::guard('sanctum')->user();
+        if ($user && $user instanceof \App\Models\NhanVien) {
+            if ($user) {
+                $ds_token = $user->tokens;
+                foreach ($ds_token as $key => $value) {
+                    $value->delete();
+                }
+                return response()->json([
+                    'status'  => 1,
+                    'message' => "Đăng xuất thành công",
+                ]);
+            } else {
+                return response()->json([
+                    'status'  => 0,
+                    'message' => "Có lỗi xảy ra",
+                ]);
+            }
+        } else {
+            return response()->json([
+                'status'  => 0,
+                'message' => "Bạn không có quyền thực hiện chức năng này!",
+            ]);
+        }
+    }
+}

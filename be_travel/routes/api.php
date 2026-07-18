@@ -25,6 +25,7 @@ use App\Http\Controllers\LichTrinhController;
 use App\Http\Controllers\QuocGiaController;
 use App\Http\Controllers\DiemDenController;
 use App\Http\Controllers\LienHeController;
+use App\Http\Controllers\PayOSController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -208,6 +209,9 @@ Route::prefix('')->group(function () {
     Route::get('/client/vnpay/check-return', [VNPayController::class, 'vnpayReturn']);
     Route::get('/client/vnpay/ipn', [VNPayController::class, 'vnpayIpn']);
 
+    // payOS webhook phải public để payOS có thể gửi kết quả thanh toán.
+    Route::post('/client/payos/webhook', [PayOSController::class, 'webhook']);
+
     // API Hướng Dẫn Viên (Đưa ra vùng Public để ai cũng xem được)
     Route::get('/client/huong-dan-vien/danh-sach', [HuongDanVienTourController::class, 'getDanhSachHDVClient']);
     Route::get('/client/huong-dan-vien/chi-tiet/{id}', [HuongDanVienTourController::class, 'getChiTietHDVClient']);
@@ -250,6 +254,10 @@ Route::prefix('')->group(function () {
         // API Vue.js gọi lên để lấy link chuyển hướng (Nên yêu cầu đăng nhập)
         Route::post('/vnpay/tao-thanh-toan', [VNPayController::class, 'createPayment']);
         Route::get('/vnpay/check-thanh-toan', [VNPayController::class, 'checkThanhToan']);
+
+        // payOS: tạo liên kết và đồng bộ trạng thái thanh toán của khách hàng hiện tại.
+        Route::post('/payos/tao-thanh-toan', [PayOSController::class, 'createPayment']);
+        Route::get('/payos/check-thanh-toan', [PayOSController::class, 'checkPayment']);
 
         // API Lịch sử hóa đơn cá nhân
         Route::get('/hoa-don/danh-sach', [HoaDonController::class, 'getHoaDonCuaKhachHang']);

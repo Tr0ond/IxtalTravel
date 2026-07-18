@@ -300,6 +300,8 @@ export default {
         formatPaymentMethod(method) {
             const methods = {
                 'vnpay': 'VNPay',
+                'payos': 'payOS',
+                'PAYOS': 'payOS',
                 'cash': 'Tiền Mặt',
                 'chuyen_khoan': 'Chuyển Khoản',  
             };
@@ -308,6 +310,8 @@ export default {
         getPaymentMethodBg(method) {
             const bgMap = {
                 'vnpay': '#e0f2fe',
+                'payos': '#ede9fe',
+                'PAYOS': '#ede9fe',
                 'cash': '#dbeafe',
                 'chuyen_khoan': '#ede9fe',
             };
@@ -316,6 +320,8 @@ export default {
         getPaymentMethodColor(method) {
             const colorMap = {
                 'vnpay': '#0369a1',
+                'payos': '#5b21b6',
+                'PAYOS': '#5b21b6',
                 'cash': '#0284c7',
                 'chuyen_khoan': '#6d28d9',
             };

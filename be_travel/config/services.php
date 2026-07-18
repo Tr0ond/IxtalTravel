@@ -41,4 +41,17 @@ return [
         'ca_bundle' => env('GEMINI_CA_BUNDLE', base_path('resources/certs/cacert.pem')),
     ],
 
+    'payos' => [
+        'client_id' => env('PAYOS_CLIENT_ID'),
+        'api_key' => env('PAYOS_API_KEY'),
+        'checksum_key' => env('PAYOS_CHECKSUM_KEY'),
+        'api_url' => env('PAYOS_API_URL', 'https://api-merchant.payos.vn'),
+        'ca_bundle' => env('PAYOS_CA_BUNDLE', base_path('resources/certs/cacert.pem')),
+        'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+        'return_url' => env('PAYOS_RETURN_URL'),
+        'cancel_url' => env('PAYOS_CANCEL_URL'),
+        'expire_minutes' => env('PAYOS_EXPIRE_MINUTES', 15),
+        'timeout' => env('PAYOS_TIMEOUT', 20),
+    ],
+
 ];

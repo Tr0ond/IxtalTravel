@@ -168,7 +168,7 @@
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="d-flex align-items-center">
                             <div class="icon-box me-3"><i class="fa-solid fa-wallet"></i></div>
-                            <span class="fw-bold">Ví điện tử (VNPAY / MoMo)</span>
+                            <span class="fw-bold">Cổng thanh toán (VNPAY / MoMo)</span>
                         </div>
                         <i v-if="method === 1" class="fa-solid fa-circle-check text-primary fs-5"></i>
                     </div>
@@ -197,20 +197,37 @@
                 </div>
 
                 <!-- Phương thức 2: Chuyển khoản QR -->
-                <div class="payment-item mt-3" :class="{ 'active': method === 2 }" @click="method = 2">
+                <div class="payment-item mt-3" :class="{ 'active': method === 2 }" @click="chonChuyenKhoanPayOS">
                     <div class="d-flex align-items-center justify-content-between">
                         <div class="d-flex align-items-center">
                             <div class="icon-box me-3"><i class="fa-solid fa-qrcode"></i></div>
-                            <span class="fw-bold">Chuyển khoản Ngân hàng</span>
+                            <span class="fw-bold">Chuyển khoản ngân hàng qua payOS</span>
                         </div>
                         <i v-if="method === 2" class="fa-solid fa-circle-check text-primary fs-5"></i>
                     </div>
                     <div v-if="method === 2" class="method-details mt-3 pt-3 border-top text-center">
-                        <p class="small text-muted mb-3">Mở ứng dụng ngân hàng và quét mã QR bên dưới để thanh toán nhanh.</p>
-                        <img v-if="thanh_toan && thanh_toan.link_qr_code" :src="thanh_toan.link_qr_code" alt="QR Code"
-                            style="width: 220px; height: 220px; object-fit: contain; border-radius: 10px;"
-                            class="shadow-sm border p-2 bg-white">
-                        <p v-else class="text-danger small mt-2">Mã QR đang được cập nhật...</p>
+                        <p class="small text-muted mb-3">Mở ứng dụng ngân hàng và quét QR payOS. Hệ thống chỉ xác nhận khi ngân hàng đã ghi nhận giao dịch.</p>
+                        <div v-if="isLoadingQr" class="py-4">
+                            <span class="spinner-border text-primary" role="status"></span>
+                            <p class="small text-muted mt-2 mb-0">Đang tạo mã QR payOS...</p>
+                        </div>
+                        <div v-else-if="payosPayment">
+                            <img :src="payosPayment.qr_image" alt="QR thanh toán payOS"
+                                style="width: 240px; height: 240px; object-fit: contain; border-radius: 10px;"
+                                class="shadow-sm border p-2 bg-white">
+                            <div class="bg-light rounded-3 p-3 mt-3 text-start small">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Số tiền:</span><b class="text-danger">{{ formatVND(payosPayment.amount) }}</b>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Nội dung:</span><b>{{ payosPayment.description }}</b>
+                                </div>
+                            </div>
+                            <div class="alert alert-warning mt-3 mb-0 py-2 small text-start">
+                                Sau khi chuyển khoản, bấm <b>Tôi đã thanh toán</b> để kiểm tra trạng thái thật từ payOS.
+                            </div>
+                        </div>
+                        <p v-else class="text-danger small mt-2">Không thể tạo mã QR payOS.</p>
                     </div>
                 </div>
             </div>
@@ -223,9 +240,9 @@
                 
                 <button class="btn btn-primary w-100 py-3 fw-bold shadow-sm d-flex align-items-center justify-content-center fs-6" 
                         @click="thanhToanAction" 
-                        :disabled="isLoading">
+                        :disabled="isLoading || isLoadingQr || (method === 2 && !payosPayment)">
                     <span v-if="isLoading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                    {{ isLoading ? 'ĐANG XỬ LÝ...' : 'XÁC NHẬN THANH TOÁN' }}
+                    {{ isLoading ? 'ĐANG KIỂM TRA...' : (method === 2 ? 'TÔI ĐÃ THANH TOÁN' : 'XÁC NHẬN THANH TOÁN') }}
                 </button>
             </div>
         </div>
@@ -235,6 +252,7 @@
 <script>
 import axios from 'axios';
 import apiUrl from '../../../utils/api';
+import { createPayOSQr, checkPayOSPayment } from '../../../utils/payos';
 
 export default {
     name: 'ThanhToan',
@@ -250,7 +268,9 @@ export default {
             is_show_modal: false,
             method: 1, 
             selectedWallet: 'vnpay', 
-            isLoading: false 
+            isLoading: false,
+            isLoadingQr: false,
+            payosPayment: null,
         }
     },
     mounted() {
@@ -307,6 +327,30 @@ export default {
             return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
         },
 
+        chonChuyenKhoanPayOS() {
+            this.method = 2;
+            if (!this.payosPayment && !this.isLoadingQr) {
+                this.taoMaQrPayOS();
+            }
+        },
+
+        async taoMaQrPayOS() {
+            const invoiceId = this.hoa_don?.id || this.hoa_don?.id_hoa_don;
+            if (!invoiceId) {
+                this.$toast.error('Không tìm thấy hóa đơn để tạo mã QR.');
+                return;
+            }
+
+            this.isLoadingQr = true;
+            try {
+                this.payosPayment = await createPayOSQr(invoiceId);
+            } catch (error) {
+                this.$toast.error(error.message);
+            } finally {
+                this.isLoadingQr = false;
+            }
+        },
+
         thanhToanAction() {
             if (this.method === 1) {
                 // Ví điện tử
@@ -338,20 +382,27 @@ export default {
                 });
             } 
             else if (this.method === 2) {
-                // Chuyển khoản QR: Đẩy qua màn kết quả trạng thái Pending
+                if (!this.payosPayment?.order_code) return;
+
                 this.isLoading = true;
-                setTimeout(() => {
-                    this.isLoading = false;
-                    this.is_show_modal = false;
-                    this.$router.push({
-                        path: '/Ket-qua-thanh-toan',
-                        query: {
-                            method: 'bank_transfer',
-                            amount: this.hoa_don.tong_tien,
-                            txnRef: 'HDTOUR' + this.hoa_don.id 
+                checkPayOSPayment(this.payosPayment.order_code)
+                    .then(payment => {
+                        this.payosPayment = { ...this.payosPayment, ...payment };
+                        if (payment.status === 'PAID') {
+                            this.$toast.success('payOS đã xác nhận thanh toán thành công!');
+                            this.is_show_modal = false;
+                            this.$router.push({
+                                path: '/Ket-qua-thanh-toan',
+                                query: { gateway: 'payos', orderCode: payment.order_code }
+                            });
+                        } else if (payment.status === 'CANCELLED') {
+                            this.$toast.error('Liên kết thanh toán payOS đã bị hủy.');
+                        } else {
+                            this.$toast.info('payOS chưa ghi nhận giao dịch. Vui lòng kiểm tra chuyển khoản và thử lại.');
                         }
-                    });
-                }, 800);
+                    })
+                    .catch(error => this.$toast.error(error.message))
+                    .finally(() => { this.isLoading = false; });
             }
         }
     }
